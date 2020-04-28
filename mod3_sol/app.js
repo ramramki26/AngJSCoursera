@@ -56,14 +56,15 @@ MenuSearchService.$inject = ['$http'];
 function MenuSearchService($http) {
   var service = this;
   var foundItems = [];
+    
   service.getMatchedMenuItems = function (searchTerm) {
+    foundItems.splice(0,foundItems.length);
     var response = $http({
       method: "GET",
       url: "https://davids-restaurant.herokuapp.com/menu_items.json"
     });
 
     return response.then(function(response){
-           foundItems.splice(0,foundItems.length)
     for (var i = 0; i < response.data.menu_items.length; i++) {
       var item = response.data.menu_items[i];
       var itemDesc = item.description
