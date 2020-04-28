@@ -1,0 +1,11 @@
+<div ng-if='notFound'>
+    <p>
+    Nothing found
+    </p>
+</div>
+<div ng-if='!notFound' ng-repeat='item in found'>
+    <p>
+    {{$index + 1}}. <b>Item name:</b> {{item.name}}, <b>Item code:</b> {{item.short_name}},<br><b>Item description:</b> {{item.description}}<br>
+    <button ng-click='onRemove({index: $index});'>Don't want this one!</button>
+    </p>
+</div>
