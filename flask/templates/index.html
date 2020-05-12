@@ -1,0 +1,22 @@
+<html>
+    <head>
+        <title>iClassifier API</title>
+    </head>
+    <body>
+        <form action="/" method="POST">
+            <input type="text" name="text"><br><br>
+            <input type="submit" name="action" value="Filter stop words"> &nbsp;&nbsp;
+            <input type="submit" name="action" value="Stemming"> &nbsp;&nbsp;
+            <input type="submit" name="action" value="Lemmatization">
+        </form>
+        {% if fil_result %}
+        <p>Filtered sentence: {{fil_result}}<p>
+        {% elif stem_result %}
+        <p>After stemming: {{stem_result}}</p>
+        {% elif lem_result %}
+        <p>After lemmatization: {{lem_result}}</p>
+        {% else %}
+        <p>Go ahead! Enter an input and click a button.</p>
+        {% endif %}
+    </body>
+</html>
