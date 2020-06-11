@@ -1,110 +1,99 @@
+import re
+import pandas as pd
+import bs4
+import requests
 import spacy
-nlp = spacy.load("en_core_web_sm")
+from spacy import displacy
+nlp = spacy.load('en_core_web_sm')
 
-### Strictly subject object? Or just relationships?
-SUBJECTS = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "expl"]
-OBJECTS = ["dobj", "attr", "oprd","pobj"]
-text = nlp("")
-sentences = list(text.sents)
-for doc in sentences:
-    relation = ""
-    obj = ""
-    sub = ""
-    
-    for token in doc:
-        print("{2}({3}-{4}, {0}-{1})".format(token.text, token.tag_, token.dep_, token.head.text, token.head.tag_))
-    
-    for token in doc:    
-        if(token.dep_ == "ROOT"):
-            relation = token.text
-            break
-    for token in doc:
-        if token.head.text in relation and token.tag_ in ["RP","IN","VBG","VBN"] and abs(token.head.i - token.i) == 1 :
-            if(token.head.i - token.i == -1):
-                relation+=" "+token.text
-            else:
-                relation=token.text+" "+relation
-    for token in doc:        
-        if(token.dep_ in SUBJECTS and token.head.text in relation):
-            sub = token.text
-            break
-    for token in doc:        
-        if(token.dep_ in OBJECTS and token.head.text in relation):
-            obj = token.text
-            break
-    
-    if(sub==""):
-        for token in doc:
-            if(token.dep_ == "advmod"):
-                if token.head.text in relation:
-                    sub = token.text
-                    break
+from spacy.matcher import Matcher 
+from spacy.tokens import Span 
 
-    if(obj==""):
-        for token in doc:
-            if(token.dep_ == "advmod"):
-                if token.head.text in relation:
-                    obj = token.text
-                    break
+import networkx as nx
 
-    if(obj==""):
-        for token in doc:
-            if(token.dep_ in OBJECTS):
-                if token.tag_ in ["NN","NNS","NNP","NNPS","PRP"]:
-                    obj = token.text
-                    break
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
-    if(obj==""):
-        for token in reversed(doc):
-            if(token.dep_ in SUBJECTS and token.text not in sub):
-                if token.tag_ in ["NN","NNS","NNP","NNPS","PRP"]:
-                    obj = token.text
-                    break
+pd.set_option('display.max_colwidth', 200)
+%matplotlib inline
 
-    for token in reversed(doc):
-        if token.dep_ == "compound":
-            if token.head.text in sub:
-                sub=token.text+" "+sub
-            if token.head.text in obj:
-                obj=token.text+" "+obj
 
-    for token in reversed(doc):
-        if token.head.text in sub and token.tag_ in ["JJ","JJS","JJR"]:
-            sub=token.text+" "+sub
-        if token.head.text in obj and token.tag_ in ["JJ","JJS","JJR"]:
-            obj=token.text+" "+obj
 
-    for token in doc:
-        if token.dep_ == "poss":
-            if token.head.text in sub:
-                sub=token.text+" "+sub
-            if token.head.text in obj:
-                obj=token.text+" "+obj
+def get_entities(sent):
+  ## chunk 1
+  ent1 = ""
+  ent2 = ""
 
-    for token in doc:
-        if token.dep_ == "det" and token.text.lower() in ["the","a","an"]:
-            if token.head.text in sub:
-                sub=token.text+" "+sub
-            if token.head.text in obj:
-                obj=token.text+" "+obj
+  prv_tok_dep = ""    # dependency tag of previous token in the sentence
+  prv_tok_text = ""   # previous token in the sentence
 
-    for token in doc:
-        if token.dep_ == "neg":
-            if token.head.text in relation:
-                relation=token.text+" "+relation
-            for token in doc:
-                if token.dep_ == "aux":
-                    if token.head.text in relation:
-                        if "'" in relation:
-                            relation=token.text+relation
-                        else:
-                            relation=token.text+" "+relation
+  prefix = ""
+  modifier = ""
 
-    for token in doc:
-        if token.dep_ == "conj":
-            if token.head.text in sub:
-                sub+=", "+token.text
-            if token.head.text in obj:
-                obj+=", "+token.text
+  #############################################################
+  
+  for tok in nlp(sent):
+    ## chunk 2
+    # if token is a punctuation mark then move on to the next token
+    if tok.dep_ != "punct":
+      # check: token is a compound word or not
+      if tok.dep_ == "compound":
+        prefix = tok.text
+        # if the previous word was also a 'compound' then add the current word to it
+        if prv_tok_dep == "compound":
+          prefix = prv_tok_text + " "+ tok.text
+      
+      # check: token is a modifier or not
+      if tok.dep_.endswith("mod") == True:
+        modifier = tok.text
+        # if the previous word was also a 'compound' then add the current word to it
+        if prv_tok_dep == "compound":
+          modifier = prv_tok_text + " "+ tok.text
+      
+      ## chunk 3
+      if tok.dep_.find("subj") == True:
+        ent1 = modifier +" "+ prefix + " "+ tok.text
+        prefix = ""
+        modifier = ""
+        prv_tok_dep = ""
+        prv_tok_text = ""      
 
-    print({'subject': sub, 'object': obj, 'relationship': relation})
+      ## chunk 4
+      if tok.dep_.find("obj") == True:
+        ent2 = modifier +" "+ prefix +" "+ tok.text
+        
+      ## chunk 5  
+      # update variables
+      prv_tok_dep = tok.dep_
+      prv_tok_text = tok.text
+  #############################################################
+
+  return [ent1.strip(), ent2.strip()]
+
+
+
+
+
+
+  def get_relation(sent):
+
+  doc = nlp(sent)
+
+  # Matcher class object 
+  matcher = Matcher(nlp.vocab)
+
+  #define the pattern 
+  pattern = [{'DEP':'ROOT'}, 
+            {'DEP':'prep','OP':"?"},
+            {'DEP':'agent','OP':"?"},  
+            {'POS':'ADJ','OP':"?"}] 
+
+  matcher.add("matching_1", None, pattern) 
+
+  matches = matcher(doc)
+  k = len(matches) - 1
+
+  span = doc[matches[k][1]:matches[k][2]] 
+
+  return(span.text)
+
